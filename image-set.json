@@ -1,0 +1,10 @@
+[
+  ["~/testdaten/isabella.tiff", "Arri Isabella ACT", "logC:AWG", 0],
+  ["~/testdaten/ACES/SonyF35.StillLife.exr", "ACES test image - Sony F35 still life", "linear:ACES-AP0", 0],
+  ["~/testdaten/ACES/syntheticChart.01.exr", "ACES test image - synthetic chart", "linear:ACES-AP0", 0],
+  ["~/testdaten/ACES/DigitalLAD.2048x1556.exr", "ACES test image - Digital LAD", "linear:ACES-AP0", 0],
+  ["~/testdaten/_R5D8140_buga-blume-bunt.EXR", "Canon 5DmkIII - Blumen Buga 1", "", 0],
+  ["~/testdaten/_R5D8248_buga-blumen-gelb-lila.EXR", "Canon 5DmkIII - Blumen Buga 2", "", 0],
+  ["~/testdaten/_R5D8255_buga-blume-nah.EXR", "Canon 5DmkIII - Blumen Buga 3", "", 0],
+  ["~/testdaten/_R5D8330_buga-libelle.EXR", "Canon 5DmkIII - Libelle", "", 0]
+]

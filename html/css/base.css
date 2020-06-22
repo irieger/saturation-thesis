@@ -1,0 +1,128 @@
+/*****  General  *****/
+body
+{
+    font-family: Arial, Helvetica, sans-serif;
+    color: #ddd;
+    background-color: #222;
+    padding-bottom: 1.5em;
+}
+
+.help .infobox
+{
+    font-weight: 550;
+    font-size: 1.1em;
+}
+
+#mode-select, #main-area
+{
+    border-top: 1px dashed #bbb;
+    padding: 1em 0;
+}
+
+#mode-select th
+{
+    text-align: left;
+    padding-right: 1.2em;
+}
+#mode-select td select
+{
+    width: 100%;
+}
+
+.color-model-parent
+{
+    text-align: center;
+}
+
+.content-block
+{
+    margin: 0.8em 0;
+    margin-bottom: 1em;
+}
+
+#saturation-select select
+{
+    margin: 0.8em 0;
+    min-width: 15em;
+}
+
+
+/*****  Graph section  *****/
+table.graph
+{
+    width: 100%;
+    /* margin-top: 1em; */
+}
+table.graph td
+{
+    width: 50%;
+    background-color: #fff;
+}
+table.graph tr td:nth-child(odd)
+{
+    text-align: right;
+}
+table.graph tr td:nth-child(even)
+{
+    text-align: left;
+}
+table.graph img
+{
+    width: 100%;
+    height: auto;
+}
+table.graph th
+{
+    margin-top: 2em;
+    font-size: 3em;
+    text-align: center !important;
+}
+
+table#settings-table tr th:nth-child(1)
+{
+    text-align: left;
+    padding-right: 1em;
+}
+table#settings-table tr :nth-child(2)
+{
+    text-align: right;
+}
+table#settings-table tr :nth-child(3)
+{
+    text-align: center;
+}
+
+
+/*****  Comparison view  *****/
+#comparison-view
+{
+    position: relative;
+    width: 100%;
+    max-height: 100%;
+    margin-bottom: 1.5em;
+}
+
+.img-comp-img
+{
+    position: absolute;
+    width: auto;
+    height: auto;
+    overflow: hidden;
+}
+  
+.img-comp-img img
+{
+    display: block;
+    vertical-align: middle;
+}
+  
+.img-comp-slider
+{
+    position: absolute;
+    z-index: 9;
+    cursor: ew-resize;
+    /*set the appearance of the slider:*/
+    width: 4px;
+    background-color: #222;
+    opacity: 0.75;
+}

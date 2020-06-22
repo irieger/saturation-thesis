@@ -1,0 +1,523 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Saturation survey</title>
+        <link rel="stylesheet" href="css/base.css">
+
+        <script src="js/vue.min.js"></script>
+        <!-- <script src="js/vue.js"></script> -->
+
+        <script src="data/dataset.js"></script>
+    </head>
+
+    <body>
+        <div id="app">
+            <h1>Saturation survey</h1>
+            <div class="help">
+                <p>
+                    <input type="checkbox" name="show-help" v-model="helpBox">
+                    <label for="show-help"><strong>Display help/descriptions?</strong></label>
+                </p>
+                <div class="infobox" v-if="helpBox">
+                    <h2>General information</h2>
+                    <p>
+                        Image data is processed using mostly methods from the <a href="https://www.colour-science.org/">colour-science.org</a>
+                        python library. In some places values are clipped within the process. For example when converting to YCbCr (709/2020)
+                        the BT.1886 curve is used before applying the RGB -> YCbCr curve which needs clipping to [0; &infin;). Overall clipping
+                        is only applied where required by the algorithms.
+                    </p>
+                    <p>
+                        Tone curve/color space is using the standard sRGB opto-electronic transfer function also clipping all values outside
+                        the range.
+                    </p>
+                    <p>
+                        Display P3 files are 16 bit PNG files, sRGB is 8 Bit.
+                    </p>
+
+                    <h2>Usage info</h2>
+                    <ul>
+                        <li>
+                            <strong>Select tonemapping/colorspace</strong>
+                            <p>
+                                Select displayed color space: sRGB and Display P3 are available.
+                                Display P3 is only recommended on Mac/Safari for now as sadly Apple seems to be the only OS/browser
+                                vendor to really focus on correct color displaying.
+                                A Tone curve with tone mapping should be added later to better compress the highlights.
+                            </p>
+                            <p>
+                                The Graph allows to display colorimetric information on how saturation in different color spaces
+                                will react on different images.
+                            </p>
+                        </li>
+
+                        <li>
+                            <strong>Image select</strong>
+                            <p>
+                                Select the image to show in regular mode / dataset to display graphs mode.
+                            </p>
+                        </li>
+
+                        <li>
+                            <strong>Saturation model selection</strong>
+                            <p>
+                                Select models to compare. Selection for left/right, slider in image can be used to swipe-compare
+                                different areas.
+                            </p>
+                        </li>
+                        <li>
+                            <strong>Saturation</strong>
+                            <p>
+                                Saturation levels to compare.
+                            </p>
+                        </li>
+                        <li>
+                            <strong>Compare with original saturation?</strong>
+                            <p>
+                                Show original image instead of the right comparison image (unchanged saturation).
+                            </p>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div id="mode-select">
+                <table>
+                    <tr>
+                        <th colspan="2">
+                            <input type="checkbox" name="graph-mode" v-model="graphMode" @change="onChangeGraphMode()">
+                            <label for="graph-mode"><strong>Show plots instead of images</strong></label>
+                        </th>
+                    </tr>
+                    <tr class="image-set">
+                        <th>
+                            <label for="image-set">Image select</label>
+                        </th>
+                        <td>
+                            <select name="image-set" v-model="selectedImageSet" @change="onChangeImageSet()">
+                                <option v-for="option in imageSets" v-bind:value="option.path">{{ option.text }}</option>
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+            <div id="settings-area">
+                
+            </div>
+            <div id="main-area">
+                <table id="settings-table">
+                    <tr v-if="!graphMode">
+                        <td></td>
+                        <td></td>
+                        <th>Link</th>
+                        <td></td>
+                    </tr>
+                    <tr v-if="!graphMode">
+                        <th>Tonemapping/ColorSpace</th>
+                        <td>
+                            <select name="color-space" v-model="leftColorSpace" @change="onChangeColorSpace(0)">
+                                <option v-for="option in colorSpaces" v-bind:value="option.path">{{ option.text }}</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="checkbox" name="link-colorspace" v-model="linkColorSpace" @change="onChangeColorSpace(-1)"> 
+                        </td>
+                        <td>
+                            <select name="color-space-right" v-model="rightColorSpace" @change="onChangeColorSpace(1)">
+                                <option v-for="option in colorSpaces" v-bind:value="option.path">{{ option.text }}</option>
+                            </select>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <th>Saturation model selection</th>
+                        <td>
+                            <select name="color-model-left" v-model="leftColorModel">
+                                <option v-for="option in colorModels" v-bind:value="option.path">{{ option.text }}</option>
+                            </select>
+                        </td>
+                        <td>|</td>
+                        <td>
+                            <select name="color-model-right" v-model="rightColorModel" v-if="!compareWithReference">
+                                <option v-for="option in colorModels" v-bind:value="option.path">{{ option.text }}</option>
+                            </select>
+                            <strong v-if="compareWithReference">Reference image (original saturation)</strong>
+                        </td>
+                    </tr>
+
+                    <tr v-if="!graphMode">
+                        <th>Saturation</th>
+                        <td>
+                            <select name="saturation" v-model="leftSaturation" dir="rtl" @change="onChangeSaturation(0)">
+                                <option v-for="option in saturationOptions" v-bind:value="option">{{ option }}</option>
+                            </select>
+                        </td>
+                        <td>
+                            <input type="checkbox" name="link-saturation" v-model="linkSaturation" @change="onChangeSaturation(-1)"> 
+                        </td>
+                        <td>
+                            <select name="saturation" v-model="rightSaturation" dir="rtl" @change="onChangeSaturation(1)" v-if="!compareWithReference">
+                                <option v-for="option in saturationOptions" v-bind:value="option">{{ option }}</option>
+                            </select>
+                            <strong v-if="compareWithReference">Reference image (original saturation)</strong>
+                        </td>
+                    </tr>
+
+                    <tr v-if="!graphMode">
+                        <td></td>
+                        <td colspan="3" style="text-align: center;">
+                            <input type="checkbox" name="reference-image" v-model="compareWithReference">
+                            <label for="reference-image">Compare with original saturation?</label>
+                        </td>
+                    </tr>
+                </table>
+
+                <div class="content-block" id="graphs-view" v-if="graphMode">
+                    <table class="graph">
+                        <tr>
+                            <th colspan="2">ICtCp</th>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_ictcp-I-Ct.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_ictcp-I-Ct.png'"></td>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_ictcp-I-Cp.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_ictcp-I-Cp.png'"></td>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_ictcp-Cp-Ct.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_ictcp-Cp-Ct.png'"></td>
+                        </tr>
+
+                        <tr>
+                            <th colspan="2">JzAzBz</th>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_jaz-Jz-Az.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_jaz-Jz-Az.png'"></td>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_jaz-Jz-Bz.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_jaz-Jz-Bz.png'"></td>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_jaz-Bz-Az.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_jaz-Bz-Az.png'"></td>
+                        </tr>
+
+                        <tr>
+                            <th colspan="2">YCbCr (ITU-R BT.709 non-const luminance)</th>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_ycbcr-Y-Cb.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_ycbcr-Y-Cb.png'"></td>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_ycbcr-Y-Cr.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_ycbcr-Y-Cr.png'"></td>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_ycbcr-Cr-Cb.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_ycbcr-Cr-Cb.png'"></td>
+                        </tr>
+
+                        <tr>
+                            <th colspan="2">uv</th>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_uv.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_uv.png'"></td>
+                        </tr>
+
+                        <tr>
+                            <th colspan="2">xy</th>
+                        </tr>
+                        <tr>
+                            <td><img :src="'data/' + selectedImageSet + '/' + leftColorModel + '/graph_xy.png'"></td>
+                            <td><img :src="'data/' + selectedImageSet + '/' + rightColorModel + '/graph_xy.png'"></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="content-block" id="comparison-view" v-else>
+                    <div class="img-comp-img img-comp-base">
+                        <img :src="getImageSource(true)" v-on:load="setChangedImage()">
+                    </div>
+                    <div class="img-comp-img img-comp-overlay">
+                        <img :src="getImageSource(false)" v-on:load="setChangedImage()">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+var app = new Vue({
+    el: '#app',
+    data: {
+        colorSpaces: [],
+        leftColorSpace: '',
+        rightColorSpace: '',
+        linkColorSpace: true,
+
+        imageSets: [],
+        selectedImageSet: '',
+
+        colorModels: [],
+        leftColorModel: '',
+        rightColorModel: '',
+
+        saturationOptions: [],
+        leftSaturation: '1.000',
+        rightSaturation: '1.000',
+        linkSaturation: true,
+        compareWithReference: false,
+
+        helpBox: false,
+        graphMode: false,
+        resetSlider: true,
+        timer: false,
+        sliderPos: -1
+    },
+    methods: {
+        onChangeImageSet: function()
+        {
+            console.log('onChangeImageSet');
+            this.sliderPos = -1;
+            this.resetSlider = true;
+        },
+        onChangeColorSpace: function (mode) {
+            if (mode < 0)
+            {
+                if (this.linkColorSpace)
+                {
+                    this.rightColorSpace = this.leftColorSpace;
+                }
+            }
+            else if (mode > 0 && this.linkColorSpace)
+            {
+                this.leftColorSpace = this.rightColorSpace;
+            }
+            else if (mode == 0 && this.linkColorSpace)
+            {
+                this.rightColorSpace = this.leftColorSpace;
+            }
+        },
+        onChangeSaturation: function (mode) {
+            if (mode < 0)
+            {
+                if (this.linkSaturation)
+                {
+                    this.rightSaturation = this.leftSaturation;
+                }
+            }
+            else if (mode > 0 && this.linkSaturation)
+            {
+                this.leftSaturation = this.rightSaturation;
+            }
+            else if (mode == 0 && this.linkSaturation)
+            {
+                this.rightSaturation = this.leftSaturation;
+            }
+        },
+        onChangeGraphMode: function () {
+            if (this.graphMode)
+            {
+                this.imageSets = survey_data_set.image_sets.graphs;
+                this.removeOldImageSliders();
+            }
+            else
+            {
+                this.imageSets = survey_data_set.image_sets.default;
+            }
+            this.selectedImageSet = this.imageSets[0].path;
+        },
+
+        getImageSource: function (is_right) {
+            this.resetSlider = true;
+
+            var image_set = this.selectedImageSet;
+            var model = 'ref';
+            var sat   = 'ref';
+            var cs    = this.leftColorSpace;  // this is valid for left images and comparison view
+
+            if (is_right && !this.compareWithReference)
+            {
+                cs    = this.rightColorSpace;
+                sat   = this.rightSaturation;
+                model = this.rightColorModel;
+            }
+            else if (!is_right)
+            {
+                sat   = this.leftSaturation;
+                model = this.leftColorModel;
+            }
+
+            return 'data/' + image_set + '/' + model + '/' + cs + '/img_' + sat + '.png';
+        },
+        checkChangedImage: function () {
+            if (this.resetSlider && !this.graphMode)
+            {
+                this.resetSlider = false;
+                this.initComparison();
+            }
+        },
+        setChangedImage: function () {
+            this.resetSlider = true;
+        },
+        removeOldImageSliders: function () {
+            var old_sliders = document.getElementsByClassName('img-comp-slider');
+            for (var i = 0; i < old_sliders.length; i++)
+            {
+                old_sliders[i].remove();
+            }
+        },
+
+        initComparison: function () {
+            var vueclass = this;
+            /** Based on https://www.w3schools.com/howto/howto_js_image_comparison.asp */
+            /* Contains hack for slider pos, reset pos will always be pos of first */
+            // var slider_init_pos = false;
+
+            // Remove old sliders (needed in case images are replaced and size doesn't match)
+            this.removeOldImageSliders();
+
+            /* Find all elements with an "base" class, needed for the original size
+               (as init is called after replacing the images) */
+            var images_base = document.getElementsByClassName("img-comp-base");
+            /* Find all elements with an "overlay" class: */
+            var images = document.getElementsByClassName("img-comp-overlay");
+            if (images.length == images_base.length)
+            {
+                for (var i = 0; i < images.length; i++)
+                {
+                    /* Once for each "overlay" element:
+                    pass the "overlay" element as a parameter when executing the compareImages function: */
+                    compareImages(images[i], images_base[i]);
+                }
+            }
+            function compareImages(img, img_base)
+            {
+                var clicked = 0;
+                /* Get the width and height of the img element */
+                var w = img_base.offsetWidth;
+                var h = img_base.offsetHeight;
+                /* Set the width of the img element to 50%: */
+
+                var slidePos = (w / 2);
+                console.log('create with slider pos', vueclass.sliderPos);
+                if (vueclass.sliderPos >= 0)
+                    slidePos = vueclass.sliderPos;
+                img.style.width = slidePos + "px";
+
+                /* Create slider: */
+                var slider = document.createElement("div");
+                slider.setAttribute("class", "img-comp-slider");
+                /* Insert slider */
+                img.parentElement.insertBefore(slider, img);
+                /* Position the slider in the middle: */
+
+                slider.style.top    = (slider.offsetHeight / 2) + "px"; //(h / 2) - (slider.offsetHeight / 2) + "px";
+                slider.style.left   = slidePos - (slider.offsetWidth / 2) + "px";
+                
+                slider.style.height = h + "px";
+                /* Execute a function when the mouse button is pressed: */
+                slider.addEventListener("mousedown", slideReady);
+                /* And another function when the mouse button is released: */
+                window.addEventListener("mouseup", slideFinish);
+                /* Or touched (for touch screens: */
+                slider.addEventListener("touchstart", slideReady);
+                /* And released (for touch screens: */
+                window.addEventListener("touchstop", slideFinish);
+
+                function slideReady(e)
+                {
+                    /* Prevent any other actions that may occur when moving over the image: */
+                    e.preventDefault();
+                    /* The slider is now clicked and ready to move: */
+                    clicked = 1;
+                    /* Execute a function when the slider is moved: */
+                    window.addEventListener("mousemove", slideMove);
+                    window.addEventListener("touchmove", slideMove);
+                }
+                function slideFinish()
+                {
+                    /* The slider is no longer clicked: */
+                    clicked = 0;
+                }
+                function slideMove(e)
+                {
+                    /* If the slider is no longer clicked, exit this function: */
+                    if (clicked == 0)
+                        return false;
+                    /* Get the cursor's x position: */
+                    var pos = getCursorPos(e)
+                    /* Prevent the slider from being positioned outside the image: */
+                    if (pos < 0)
+                        pos = 0;
+                    if (pos > w)
+                        pos = w;
+                    /* Execute a function that will resize the overlay image according to the cursor: */
+                    slide(pos);
+                }
+                function getCursorPos(e)
+                {
+                    e = e || window.event;
+                    /* Get the x positions of the image: */
+                    var a = img.getBoundingClientRect();
+                    /* Calculate the cursor's x coordinate, relative to the image: */
+                    var x = e.pageX - a.left;
+                    /* Consider any page scrolling: */
+                    x = x - window.pageXOffset;
+                    return x;
+                }
+                function slide(x)
+                {
+                    vueclass.sliderPos = x;
+                    /* Resize the image: */
+                    img.style.width = x + "px";
+                    /* Position the slider: */
+                    slider.style.left = img.offsetWidth - (slider.offsetWidth / 2) + "px";
+                }
+            }
+        }
+    },
+    created: function()
+    {
+        this.colorModels             = survey_data_set.color_models;
+        this.leftColorModel  = this.colorModels[0].path;
+        this.rightColorModel = this.colorModels[1].path;
+
+        this.colorSpaces = survey_data_set.color_spaces.filter(function(value, index, arr)
+                    { return value.path != 'graphs'; });
+        this.leftColorSpace  = this.colorSpaces[0].path;
+        this.rightColorSpace = this.colorSpaces[0].path;
+
+        var ua = navigator.userAgent.toLowerCase();
+        var def_cs = 'srgb_hermite_rgb';
+        if (ua.indexOf('applewebkit') > -1 && ua.indexOf('safari') > -1)
+        {
+            def_cs = 'disp3_hermite_rgb';
+        }
+        for (var i = 0; i < this.colorSpaces.length; i++)
+        {
+            if (this.colorSpaces[i].path == def_cs)
+            {
+                this.leftColorSpace  = def_cs;
+                this.rightColorSpace = def_cs;
+                break;
+            }
+        }
+
+        this.onChangeGraphMode();
+
+        for (var i = 0; i < survey_data_set.saturation.length; i++)
+        {
+            this.saturationOptions.push(survey_data_set.saturation[i].toFixed(3) + '');
+        }
+
+        this.timer = setInterval(this.checkChangedImage, 100)
+        this.resetSlider = true;
+        //setTimeout(this.setChangedImage, 300);  // Force setting reset when stuff is loaded first (macOS/Safari problem)
+    }
+})
+        </script>
+    </body>
+</html>

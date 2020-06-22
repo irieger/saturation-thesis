@@ -1,0 +1,6 @@
+[submodule "external/color-data"]
+	path = external/color-data
+	url = https://github.com/nschloe/color-data.git
+[submodule "external/compact-icc-profiles"]
+	path = external/compact-icc-profiles
+	url = https://github.com/saucecontrol/Compact-ICC-Profiles

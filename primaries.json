@@ -1,0 +1,11 @@
+[
+  [
+    "sRGB primaries * 0.6", [[ 0.6,  0.0,  0.0], [ 0.0,  0.6,  0.0], [ 0.0,  0.0,  0.6]], "linear:srgb"
+  ],
+  [
+    "DCI-P3 (D65) primaries * 0.6", [[ 0.6,  0.0,  0.0], [ 0.0,  0.6,  0.0], [ 0.0,  0.0,  0.6]], "linear:p3-d65"
+  ],
+  [
+    "Arri Isabella sample [every 75000th pixel]", "~/testdaten/isabella.tiff", "logC:AWG", 75000
+  ]
+]
