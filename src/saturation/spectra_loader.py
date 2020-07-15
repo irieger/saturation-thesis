@@ -70,5 +70,5 @@ def read_cie1931():
 def spectra_integrate(data, response):
     result = np.zeros(data.shape[:-1] + (response.shape[1],))
     for i in range(response.shape[1]):
-        result[:, i] = np.sum(np.multiply(data, response[:,i]), axis=-1)
+        result[..., i] = np.sum(np.multiply(data, response[:,i]), axis=-1)
     return result

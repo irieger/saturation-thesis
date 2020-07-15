@@ -37,12 +37,12 @@ class OptimizerBase(ABC):
         self.lut_done         = None
         self.points_to_solve  = []
         self.xyz              = read_cie1931()
-        self.response         = False
+        self.response         = None
         self.is_uv            = is_uv
 
         self.lut_min_max      = np.array([0.0, 1.0])
         self.lut_dim_2d       = lut_dim_2d
-        self.lut_entry_values = 3
+        self.lut_entry_values = 2
         self.compact_lut      = compact_lut
         self.log              = ''
 
@@ -275,11 +275,12 @@ class OptimizerBase(ABC):
         #if fitter_state < FitterState.BASE_FIT.value:
         #    fitter_state = FitterState.INIT
         response = None
-        if not self.response is None:
+        if self.response:
             response = self.response.tolist()
 
         # TODO: Fill with all values from base class besides the LUT arrays!
         base_struct = {
+            'type':             self._TYPE,
             'fitter_state':     fitter_state,
             'points_to_solve':  self.points_to_solve,
             'xyz':              self.xyz.tolist(),
@@ -310,6 +311,9 @@ class OptimizerBase(ABC):
         data = None
         try:
             with open(os.path.join(folder, 'info.yml'), 'r') as f:
+                if data['type'] != self._TYPE:
+                    return False
+
                 data = yaml.load(f)
                 self.fitter_state     = FitterState(data['fitter_state'])
                 self.points_to_solve  = data['points_to_solve']
@@ -349,9 +353,9 @@ class OptimizerBase(ABC):
 
     def createHull(self):
         resp = self.xyz
-        if not self.response is None:
+        if self.response:
             resp = self.response
-        monochromatics = np.identity(resp.shape[0])
+        monochromatics = np.identity(resp.shape[0]) * 1000
         monochromatics = spectra_integrate(monochromatics, resp[:,1:])
         pts = OptimizerBase.xyzToXy(monochromatics)
         if self.is_uv:
@@ -402,30 +406,30 @@ class OptimizerBase(ABC):
 
 
     def xyzToXy(data):
-        s = np.sum(data, axis=1)
+        s = np.sum(data, axis=-1)
         s[s < 0.0000000001] = 1
-        r = np.zeros((data.shape[0], 2))
-        r[:, 0] = np.divide(data[:, 0], s)
-        r[:, 1] = np.divide(data[:, 1], s)
+        r = np.zeros(data.shape[:-1] + (2,))
+        r[..., 0] = np.divide(data[..., 0], s)
+        r[..., 1] = np.divide(data[..., 1], s)
         return r
     
     def xyToUv(data):
-        x = data[:,0]
-        y = data[:,1]
+        x = data[...,0]
+        y = data[...,1]
         t = -2 * x + 12 * y + 3
         
         res = np.zeros(data.shape)
-        res[:,0] = 4 * x / t
-        res[:,1] = 9 * y / t
+        res[...,0] = 4 * x / t
+        res[...,1] = 9 * y / t
         return res
 
     def uvToXy(data):
-        u = data[:,0]
-        v = data[:,1]
+        u = data[...,0]
+        v = data[...,1]
         t = 6 * u - 16 * v + 12
 
         res = np.zeros(data.shape)
-        res[:,0] = 9 * u / t
-        res[:,1] = 4 * v / t
+        res[...,0] = 9 * u / t
+        res[...,1] = 4 * v / t
         return res
         

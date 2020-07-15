@@ -3,18 +3,17 @@ from .optimizerbase import *
 class Meng(OptimizerBase):
 
     def __init__(self, response_file, *args, **kwargs):
+        self._TYPE = 'Meng'
         if not 'is_uv' in kwargs:
             kwargs['is_uv'] = False
         super().__init__(*args, **kwargs)
         if response_file:
             self.response = reduce_spectra(read_spectra(response_file))[0]
             self.xyz      = reduce_to_wavelengths(self.xyz, self.response[0, 0], self.response[-1, 0])
-    
+
     def save(self, folder, *args, **kwargs):
         meng_struct = {}
         if self._saveBase(folder, meng_struct, *args, **kwargs):
-            if self.fitter_state.value > FitterState.BASE_FIT.value:
-                pass
             return True
         
         print('Failed to save')
