@@ -6,19 +6,16 @@ class KSM(OptimizerBase):
         self._TYPE = 'KSM'
         super().__init__(*args, **kwargs)
 
-        self.xyz          = reduce_to_wavelengths(self.xyz, start_wl, end_wl)
-        self.maxiter      = 10000  # Check for sane values
-        # self.ftol         = 5e-7
-        self.ftol         = 1e-8
+        self.xyz        = reduce_to_wavelengths(self.xyz, start_wl, end_wl)
+        self.maxiter    = 10000  # Check for sane values
+        self.ftol       = 1e-8
+
+        self._max_dist  = 0.07
+        self._theta_min = 1e-7
+        self._theta_max = 25
 
         self._scatter   = None
-        self._max_dist  = 0.07
-        # self._theta_min = 1e-7
-        # self._theta_max = 25
-        self._sigma_min = 0.000001
-        self._sigma_max = 1500.0000000
-
-        self._indices  = None
+        self._indices   = None
 
         self._prepRangesCache()
 
@@ -34,12 +31,13 @@ class KSM(OptimizerBase):
         self.inrange1   = self.wlin_u - self.wlin_l - self.inrange0
     
     def save(self, folder, *args, **kwargs):
-        # Todo: save all parameters!
         ksm_struct = {
-            'ksm_max_dist' : self._max_dist,
+            'ksm_max_dist':  self._max_dist,
+            'ksm_theta_min': self._theta_min,
+            'ksm_theta_max': self._theta_max,
         }
         if self._saveBase(folder, ksm_struct, *args, **kwargs):
-            if not self._scatter:
+            if not self._scatter is None:
                 np.savez_compressed(os.path.join(folder, 'ksm_scatter.npz'), self._scatter)
             return True
         
@@ -56,6 +54,14 @@ class KSM(OptimizerBase):
                 obj._indices = np.linspace(0, i-1, num=i, dtype=np.uint32)
             else:
                 obj.fitter_state = FitterState.INIT
+
+            if 'ksm_max_dist' in data:
+                obj._max_dist = data['ksm_max_dist']
+            if 'ksm_theta_min' in data:
+                obj._theta_min = data['ksm_theta_min']
+            if 'ksm_theta_max' in data:
+                obj._theta_max = data['ksm_theta_max']
+
             obj._prepRangesCache()
             return obj
         return None
@@ -109,18 +115,16 @@ class KSM(OptimizerBase):
                     if not np.isnan(xy[0,0]) and not np.isnan(xy[0,1]):
                         gauss_funcs[i, 0:2] = xy[0,:]
                         gauss_funcs[i, 2]   = peak
-                        gauss_funcs[i, 3]   = sig   #theta
+                        gauss_funcs[i, 3]   = theta
                         i += 1
                     else:
                         cnt += 1
         print("_prepareOptimizer invalid entries: ", cnt)
 
         self._scatter = gauss_funcs[0:i, :].copy()
-        # if self.is_uv:
-        #     self._scatter[..., :2] = OptimizerBase.xyToUv(gauss_funcs[0:i, :2])
         self._indices = np.linspace(0, i-1, num=i, dtype=np.uint32)
 
-        self.__fit_bounds  = [(self.wlin_l, self.wlin_u), (self._sigma_min, self._sigma_max)]
+        self.__fit_bounds  = [(self.wlin_l, self.wlin_u), (self._theta_min, self._theta_max)]
         self.fitter_state  = FitterState.READY
     
     def getX0(self, xy):
@@ -131,8 +135,7 @@ class KSM(OptimizerBase):
             mdist += 0.005
             dist   = np.sqrt(np.power(self._scatter[:,0] - xy[0], 2) + np.power(self._scatter[:,1] - xy[1], 2))
         if mdist >= max_dist:
-            # Todo: Change second value if using theta instead of sigma
-            return np.array([555, 400])
+            return np.array([555, 0.0001])
 
         idx  = self._indices[dist < mdist]
         midx = np.argmin(self._scatter[idx, 3])
@@ -178,27 +181,17 @@ class KSM(OptimizerBase):
 
         def objective(s):
             # Target is to get Theta (s[1]) as low as possible -> smooth spectra
-            #return s[1]
-            # Switched to sigma
-            return 1 / s[1]
+            return s[1]
 
         def constrHelper(x):
             params = np.array(x)
-            # if params[0] < self.wlin_l:
-            #     params[0] = self.wlin_u - (self.wlin_l - params[0])
-            # elif params[0] > self.wlin_u:
-            #     params[0] = self.wlin_l + (params[0] - self.wlin_u)
-            params[1] = KSM.stddevToTheta(params[1])
             xyz    = spectra_integrate(self.gauss(params[None, ...]), self.xyz[:, 1:])
             return OptimizerBase.xyzToXy(xyz).flatten() - txy
 
         x0        = self.getX0(txy)
         bounds    = self.__fit_bounds.copy()
         ftol      = self.ftol
-        #bounds[1] = (self._theta_min / 100, self._theta_max)
-        # if np.abs(x0[0] - self.wlin_l) < 4 or np.abs(self.wlin_u - x0[0]) < 4:
-        #     bounds[1] = (self._theta_min / 100, self._theta_max)
-        #     ftol  = 5e-7
+
         cnstr     = {
                 'type': 'eq',
                 'fun': constrHelper
@@ -208,37 +201,39 @@ class KSM(OptimizerBase):
         
         if not res.success:
             err_message = 'Error for pos={} after {} iterations: {}'.format(pos, res.nit, res.message)
-            print('Error struct', res)
-            print(txy)
-            print(x0)
-            print(bounds)
-            return ([0] * 2, True, err_message)
+            return ([0] * 3, True, err_message)
         else:
-            # The result may contain some very tiny negative values due
-            # to numerical issues. Clamp those to 0.
-            rval    = np.array([x for x in res.x])
-            # rval[1] = max(rval[1], self._theta_min)
-            rval[1] = KSM.stddevToTheta(rval[1])
+            rval     = np.zeros((3))
+            rval[:2] = self.peakToArc(np.array(res.x[0]))
+            rval[2]  = res.x[1]
             return (rval, False, "")
     
-    def postOptimizer(self):
-        print('No real work done in post process, needs conversion to coordinates instead of ')
+    # Todo test if old cubic interpolation is advicable
+    #def postOptimizer(self):
+    #    print('No real work done in post process, needs conversion to coordinates instead of ')
     
     def lookup(self, **kwargs):
-        pq, s  = self.toCoordinates(**kwargs)
-        lookup = self.bilinearInterpolation(pq)
+        pq, s       = self.toCoordinates(**kwargs)
+        lookup      = self.bilinearInterpolation(pq)
+        data        = np.ones(lookup.shape)
+        data[...,1] = self.arcToPeak(lookup[...,:2])
+        data[...,2] = lookup[...,2]
         if s is None:
-            return lookup
-        return np.multiply(lookup, s[...,None])
+            return data[...,1:]
+        
+        y = kwargs['xyz'][...,1].copy()
+        rec = self.toXyz(data)
+        data[...,0] = np.divide(y, rec[...,1])
+        return data
 
     def saturate(self, data, saturation):
-        mval = np.max(data, axis=-1)
-        mval_nonzero = mval.copy()
-        mval_nonzero[mval_nonzero < self.spectra_epsilon] = 1.0
-        return np.multiply(np.power(np.divide(data, mval_nonzero[...,None]), saturation), mval[...,None])
+        res        = data.copy()
+        res[...,2] = res[...,2] * saturation
+        return res
 
     def toXyz(self, data):
-        return spectra_integrate(data, self.xyz[:,1:])
+        xyz = spectra_integrate(self.gauss(data[...,1:]), self.xyz[:,1:])
+        return np.multiply(xyz, data[...,0][...,None])
 
     def peakToArc(self, peak_wl):
         """

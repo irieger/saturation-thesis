@@ -42,7 +42,7 @@ class OptimizerBase(ABC):
 
         self.lut_min_max      = np.array([0.0, 1.0])
         self.lut_dim_2d       = lut_dim_2d
-        self.lut_entry_values = 2
+        self.lut_entry_values = 3
         self.compact_lut      = compact_lut
         self.log              = ''
 
@@ -154,12 +154,11 @@ class OptimizerBase(ABC):
             os.sched_setaffinity(0, [wnum])
             while True:
                 try:
-                    idx, value = input_queue.get(block=False)
+                    idx, value = input_queue.get(block=True)
                     if value == 'STOP':
                         break
                     xx = dim_base + value[0] * dim_mult
                     yy = dim_base + value[1] * dim_mult
-                    #print(xx, yy)
                     success = False
                     try:
                         fit_res = self.fit(default=[xx, yy])
