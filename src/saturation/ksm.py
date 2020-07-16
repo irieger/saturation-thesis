@@ -7,13 +7,16 @@ class KSM(OptimizerBase):
         super().__init__(*args, **kwargs)
 
         self.xyz          = reduce_to_wavelengths(self.xyz, start_wl, end_wl)
-        self.maxiter      = 20000  # Check for sane values
-        self.ftol         = 5e-7
+        self.maxiter      = 10000  # Check for sane values
+        # self.ftol         = 5e-7
+        self.ftol         = 1e-8
 
         self._scatter   = None
         self._max_dist  = 0.07
-        self._theta_min = 1e-7
-        self._theta_max = 25
+        # self._theta_min = 1e-7
+        # self._theta_max = 25
+        self._sigma_min = 0.000001
+        self._sigma_max = 1500.0000000
 
         self._indices  = None
 
@@ -31,11 +34,12 @@ class KSM(OptimizerBase):
         self.inrange1   = self.wlin_u - self.wlin_l - self.inrange0
     
     def save(self, folder, *args, **kwargs):
+        # Todo: save all parameters!
         ksm_struct = {
             'ksm_max_dist' : self._max_dist,
         }
         if self._saveBase(folder, ksm_struct, *args, **kwargs):
-            if not self._scatter is None and not self._indices is None:
+            if not self._scatter:
                 np.savez_compressed(os.path.join(folder, 'ksm_scatter.npz'), self._scatter)
             return True
         
@@ -57,7 +61,7 @@ class KSM(OptimizerBase):
         return None
 
     def gauss(self, params):
-        peak = params[...,0]
+        peak = params[...,0] - self.wlin_l
         peak = np.repeat(peak[..., None], self.inrange1.shape[-1], axis=-1)
         theta = params[...,1]
         theta = np.repeat(theta[..., None], self.inrange1.shape[-1], axis=-1)
@@ -90,14 +94,14 @@ class KSM(OptimizerBase):
         gauss_funcs = np.zeros((peak_space.shape[0] * sig_space.shape[0] * len(k_space), 4))
         maximum     = 1.0
 
-        i = 0
+        i   = 0
         cnt = 0
-        sig_max = 0
+        # sig_max = 0
         for peak in peak_space:
             for sig_val in sig_space:
                 for k in k_space:
                     sig     = sig_val**k  #**2
-                    sig_max = max(sig_max, sig)
+                    #sig_max = max(sig_max, sig)
                     theta   = KSM.stddevToTheta(np.array([sig]))[0]
                     val     = self.gauss(np.array([peak, theta]))
                     xy      = OptimizerBase.xyzToXy(self.toXyz(val[None, ...]))
@@ -105,18 +109,18 @@ class KSM(OptimizerBase):
                     if not np.isnan(xy[0,0]) and not np.isnan(xy[0,1]):
                         gauss_funcs[i, 0:2] = xy[0,:]
                         gauss_funcs[i, 2]   = peak
-                        gauss_funcs[i, 3]   = theta
+                        gauss_funcs[i, 3]   = sig   #theta
                         i += 1
                     else:
                         cnt += 1
         print("_prepareOptimizer invalid entries: ", cnt)
 
         self._scatter = gauss_funcs[0:i, :].copy()
-        if self.is_uv:
-            self._scatter[..., :2] = OptimizerBase.xyToUv(gauss_funcs[0:i, :2])
+        # if self.is_uv:
+        #     self._scatter[..., :2] = OptimizerBase.xyToUv(gauss_funcs[0:i, :2])
         self._indices = np.linspace(0, i-1, num=i, dtype=np.uint32)
 
-        self.__fit_bounds  = [(self.wlin_l - 2, self.wlin_u + 2), (self._theta_min, self._theta_max)]
+        self.__fit_bounds  = [(self.wlin_l, self.wlin_u), (self._sigma_min, self._sigma_max)]
         self.fitter_state  = FitterState.READY
     
     def getX0(self, xy):
@@ -127,6 +131,7 @@ class KSM(OptimizerBase):
             mdist += 0.005
             dist   = np.sqrt(np.power(self._scatter[:,0] - xy[0], 2) + np.power(self._scatter[:,1] - xy[1], 2))
         if mdist >= max_dist:
+            # Todo: Change second value if using theta instead of sigma
             return np.array([555, 400])
 
         idx  = self._indices[dist < mdist]
@@ -159,11 +164,11 @@ class KSM(OptimizerBase):
                 pos = OptimizerBase.uvToXy(np.array(uv))
             txy = OptimizerBase.uvToXy(np.array(uv))
         elif not xyz is None:
-            temp = OptimizerBase.xyzToXy(np.array(xyz))
+            txy = OptimizerBase.xyzToXy(np.array(xyz))
             if self.is_uv:
-                pos = OptimizerBase.xyToUv(temp)
+                pos = OptimizerBase.xyToUv(txy)
             else:
-                pos = temp
+                pos = txy
         else:
             print('Invalid value call')
             return ([0] * self.lut_entry_values, True, 'Invalid input!')
@@ -173,21 +178,24 @@ class KSM(OptimizerBase):
 
         def objective(s):
             # Target is to get Theta (s[1]) as low as possible -> smooth spectra
-            return s[1]
+            #return s[1]
+            # Switched to sigma
+            return 1 / s[1]
 
         def constrHelper(x):
             params = np.array(x)
-            if params[0] < self.wlin_l:
-                params[0] = self.wlin_u - (self.wlin_l - params[0])
-            elif params[0] > self.wlin_u:
-                params[0] = self.wlin_l + (params[0] - self.wlin_u)
+            # if params[0] < self.wlin_l:
+            #     params[0] = self.wlin_u - (self.wlin_l - params[0])
+            # elif params[0] > self.wlin_u:
+            #     params[0] = self.wlin_l + (params[0] - self.wlin_u)
+            params[1] = KSM.stddevToTheta(params[1])
             xyz    = spectra_integrate(self.gauss(params[None, ...]), self.xyz[:, 1:])
             return OptimizerBase.xyzToXy(xyz).flatten() - txy
 
-        x0        = self.getX0(pos)
+        x0        = self.getX0(txy)
         bounds    = self.__fit_bounds.copy()
         ftol      = self.ftol
-        bounds[1] = (self._theta_min / 100, self._theta_max)
+        #bounds[1] = (self._theta_min / 100, self._theta_max)
         # if np.abs(x0[0] - self.wlin_l) < 4 or np.abs(self.wlin_u - x0[0]) < 4:
         #     bounds[1] = (self._theta_min / 100, self._theta_max)
         #     ftol  = 5e-7
@@ -208,9 +216,13 @@ class KSM(OptimizerBase):
         else:
             # The result may contain some very tiny negative values due
             # to numerical issues. Clamp those to 0.
-            rval    = [x for x in res.x]
-            rval[1] = max(rval[1], self._theta_min)
+            rval    = np.array([x for x in res.x])
+            # rval[1] = max(rval[1], self._theta_min)
+            rval[1] = KSM.stddevToTheta(rval[1])
             return (rval, False, "")
+    
+    def postOptimizer(self):
+        print('No real work done in post process, needs conversion to coordinates instead of ')
     
     def lookup(self, **kwargs):
         pq, s  = self.toCoordinates(**kwargs)
@@ -232,7 +244,7 @@ class KSM(OptimizerBase):
         """
         Convert peak wavelength value to circle arc position as xy coordinates
         """
-        res = np.zeros(peak_wl.shape + (2,))
+        res        = np.zeros(peak_wl.shape + (2,))
         multiplier = 2 * np.pi / (self.wlin_u - self.wlin_l)
         alpha      = (peak_wl - self.wlin_l) * multiplier
         res[...,0] = np.cos(alpha)
@@ -244,7 +256,7 @@ class KSM(OptimizerBase):
         Convert peak wavelength value to circle arc position as xy coordinates
         """
         multiplier = 2 * np.pi / (self.wlin_u - self.wlin_l)
-        alpha = np.array(np.arctan2(coords[..., 1], coords[..., 0]))
+        alpha      = np.array(np.arctan2(coords[..., 1], coords[..., 0]))
         alpha[alpha < 0] = 2 * np.pi + alpha[alpha < 0]
         while (np.any(alpha > 2 * np.pi)):
             alpha[alpha > 2 * np.pi] = alpha[alpha > 2 * np.pi] - 2*np.pi
