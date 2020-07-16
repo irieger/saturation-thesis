@@ -102,14 +102,12 @@ class KSM(OptimizerBase):
 
         i   = 0
         cnt = 0
-        # sig_max = 0
         for peak in peak_space:
             for sig_val in sig_space:
                 for k in k_space:
-                    sig     = sig_val**k  #**2
-                    #sig_max = max(sig_max, sig)
+                    sig     = sig_val**k
                     theta   = KSM.stddevToTheta(np.array([sig]))[0]
-                    val     = self.gauss(np.array([peak, theta]))
+                    val     = np.array([1.0, peak, theta])
                     xy      = OptimizerBase.xyzToXy(self.toXyz(val[None, ...]))
 
                     if not np.isnan(xy[0,0]) and not np.isnan(xy[0,1]):
@@ -208,7 +206,8 @@ class KSM(OptimizerBase):
             rval[2]  = res.x[1]
             return (rval, False, "")
     
-    # Todo test if old cubic interpolation is advicable
+    # Todo test if old cubic interpolation is advicable -> As so few entries fail to result in a viable parameter set,
+    # it doesn't seem necessary to use cubic here maybe
     #def postOptimizer(self):
     #    print('No real work done in post process, needs conversion to coordinates instead of ')
     
@@ -232,6 +231,9 @@ class KSM(OptimizerBase):
         return res
 
     def toXyz(self, data):
+        if data.shape[-1] == self.xyz.shape[0]:
+            # Fallback for calls with pre-evaluated spectra
+            return spectra_integrate(data, self.xyz[:,1:])
         xyz = spectra_integrate(self.gauss(data[...,1:]), self.xyz[:,1:])
         return np.multiply(xyz, data[...,0][...,None])
 
