@@ -45,7 +45,7 @@ class KSM(OptimizerBase):
         return False
 
     def load(folder):
-        obj = Meng(None)
+        obj = KSM()
         data = obj._loadBase(folder)
         if data:
             if os.path.exists(os.path.join(folder, 'ksm_scatter.npz')):

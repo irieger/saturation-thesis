@@ -2,13 +2,16 @@ from .optimizerbase import *
 
 class Meng(OptimizerBase):
 
-    def __init__(self, response_file, *args, **kwargs):
+    def __init__(self, response, *args, **kwargs):
         self._TYPE = 'Meng'
         if not 'is_uv' in kwargs:
             kwargs['is_uv'] = False
         super().__init__(*args, **kwargs)
-        if response_file:
-            self.response = reduce_spectra(read_spectra(response_file))[0]
+        if isinstance(response, str) :
+            self.response = reduce_spectra(read_spectra(response))[0]
+            self.xyz      = reduce_to_wavelengths(self.xyz, self.response[0, 0], self.response[-1, 0])
+        elif isinstance(response, np.ndarray):
+            self.response = response
             self.xyz      = reduce_to_wavelengths(self.xyz, self.response[0, 0], self.response[-1, 0])
 
     def save(self, folder, *args, **kwargs):

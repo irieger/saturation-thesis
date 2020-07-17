@@ -2,6 +2,7 @@ import math
 import yaml
 import time
 import os
+import sys
 import pathlib
 from enum import Enum
 from abc import ABC, abstractmethod
@@ -271,13 +272,10 @@ class OptimizerBase(ABC):
             return False
         
         fitter_state = self.fitter_state.value
-        #if fitter_state < FitterState.BASE_FIT.value:
-        #    fitter_state = FitterState.INIT
         response = None
-        if self.response:
+        if isinstance(self.response, np.ndarray):
             response = self.response.tolist()
 
-        # TODO: Fill with all values from base class besides the LUT arrays!
         base_struct = {
             'type':             self._TYPE,
             'fitter_state':     fitter_state,
@@ -310,10 +308,10 @@ class OptimizerBase(ABC):
         data = None
         try:
             with open(os.path.join(folder, 'info.yml'), 'r') as f:
+                data = yaml.load(f)
                 if data['type'] != self._TYPE:
                     return False
 
-                data = yaml.load(f)
                 self.fitter_state     = FitterState(data['fitter_state'])
                 self.points_to_solve  = data['points_to_solve']
                 self.xyz              = np.array(data['xyz'])
@@ -334,6 +332,8 @@ class OptimizerBase(ABC):
                 self.lut_data = np.load(os.path.join(folder, 'lut_data.npz'))['arr_0']
                 self.lut_done = np.load(os.path.join(folder, 'lut_done.npz'))['arr_0']
         except:
+            e = sys.exc_info()[0]
+            print('Reached except', e)
             return False
         return data
 
@@ -352,7 +352,7 @@ class OptimizerBase(ABC):
 
     def createHull(self):
         resp = self.xyz
-        if self.response:
+        if not self.response is None:
             resp = self.response
         monochromatics = np.identity(resp.shape[0]) * 1000
         monochromatics = spectra_integrate(monochromatics, resp[:,1:])
