@@ -33,6 +33,11 @@ if obj.calculateLut():
         print('Success in creating the LUT')
         print('Finished at ', datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         sys.exit(0)
+    else:
+    	print('FAILED TO SAVE')
+else:
+	print('FAILED TO CALCULATE')
+print('')
 
 print('         -  !!!!!  -')
 print('FAILED TO CREATE LUT')

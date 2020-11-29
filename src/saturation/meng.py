@@ -1,5 +1,6 @@
 from .optimizerbase import *
 
+
 class Meng(OptimizerBase):
 
     def __init__(self, response, *args, **kwargs):

@@ -264,7 +264,9 @@ class OptimizerBase(ABC):
         done[~done]   = True
         self.lut_data = data.copy()
         self.lut_done = done.copy()
+
         self.fitter_state = FitterState.FILLED
+        return True
 
     def _saveBase(self, folder, fill_struct = {}, overwrite = False):
         if os.path.exists(folder) and not overwrite:

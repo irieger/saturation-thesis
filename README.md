@@ -19,7 +19,7 @@ The following Python modules are needed:
 As submodules are used in some places use
 
 ```sh
-git clone --recursive https://github.com/irieger/saturation-survey.git
+git clone --recursive https://github.com/irieger/saturation-thesis.git
 ```
 
 for checkout.
