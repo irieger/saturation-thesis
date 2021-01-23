@@ -39,7 +39,7 @@ def reduce_spectra(data, low = 0, high = -1, eps = 0.0000000001):
                 high = i
                 break
     # high+1 to compensate for pythons excluding ranges notation
-    return (data[:, low:high+1], low, high)
+    return (data[low:high+1, :], low, high)
 
 def reduce_to_wavelengths(data, min_wl, max_wl):
     try:

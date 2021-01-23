@@ -8,7 +8,7 @@ class Meng(OptimizerBase):
         if not 'is_uv' in kwargs:
             kwargs['is_uv'] = False
         super().__init__(*args, **kwargs)
-        if isinstance(response, str) :
+        if isinstance(response, str):
             self.response = reduce_spectra(read_spectra(response))[0]
             self.xyz      = reduce_to_wavelengths(self.xyz, self.response[0, 0], self.response[-1, 0])
         elif isinstance(response, np.ndarray):
